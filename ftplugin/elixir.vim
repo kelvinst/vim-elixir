@@ -50,18 +50,52 @@ onoremap <buffer> <silent> <expr> [] ':silent keeppatterns ?'.b:block_end  .'<CR
 let b:undo_ftplugin = 'setlocal sw< sts< et< isk< com< cms< path< inex< sua< def< fo<'.
       \ '| unlet! b:match_ignorecase b:match_words b:block_begin b:block_end'
 
-function s:projectionist_detect_elixir()
-  if filereadable('mix.exs')
-    let root = simplify(fnamemodify('.', ':p:s?[\/]$??'))
+if get(g:, 'loaded_projectionist', 0)
+  let g:projectionist_heuristics = get(g:, 'projectionist_heuristics', {})
 
-    let projections = {}
-    let projections['lib/*.ex'] = { 'type': 'main', 'alternate': ['test/{}_test.exs'] }
-    let projections['lib/**/*.ex'] = { 'type': 'main', 'alternate': ['test/{}_test.exs'] }
-    let projections['test/*_test.exs'] = { 'type': 'test', 'alternate': ['lib/{}.ex'] }
-    let projections['test/**/*_test.exs'] = { 'type': 'test', 'alternate': ['lib/{}.ex'] }
+  call extend(g:projectionist_heuristics, {
+        \ "&mix.exs":
+        \   {
+        \     'apps/*/mix.exs': { 'type': 'app' },
+        \     'lib/*.ex': {
+        \       'type': 'lib',
+        \       'alternate': 'test/{}_test.exs',
+        \       'template': [
+        \         'defmodule {camelcase|capitalize|dot} do',
+        \         'end'
+        \       ],
+        \     },
+        \     'test/*_test.exs': {
+        \       'type': 'test',
+        \       'alternate': 'lib/{}.ex',
+        \       'dispatch': "mix test test/{}_test.exs`=v:lnum ? ':'.v:lnum : ''`",
+        \       'template': [
+        \         'defmodule {camelcase|capitalize|dot}Test do',
+        \         '  use ExUnit.Case',
+        \         '',
+        \         '  alias {camelcase|capitalize|dot}',
+        \         '',
+        \         '  doctest {basename|capitalize}',
+        \         'end'
+        \       ],
+        \     },
+        \     'mix.exs': { 'type': 'mix' },
+        \     'config/*.exs': { 'type': 'config' },
+        \     '*.ex': {
+        \       'makery': {
+        \         'lint': { 'compiler': 'credo' },
+        \         'test': { 'compiler': 'exunit' },
+        \         'build': { 'compiler': 'mix' }
+        \       }
+        \     },
+        \     '*.exs': {
+        \       'makery': {
+        \         'lint': { 'compiler': 'credo' },
+        \         'test': { 'compiler': 'exunit' },
+        \         'build': { 'compiler': 'mix' }
+        \       }
+        \     }
+        \   }
+        \ }, 'keep')
+endif
 
-    call projectionist#append(root, projections)
-  endif
-endfunc
-
-autocmd User ProjectionistDetect call s:projectionist_detect_elixir()
